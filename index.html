@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Chấm Tự Luận Tin Học 11 - VideoPad & Kịch Bản Phim</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tesseract.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    .scan-laser {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+      box-shadow: 0 0 10px #3b82f6;
+      animation: scanAnim 2.2s infinite ease-in-out;
+    }
+    @keyframes scanAnim {
+      0% { top: 5%; }
+      50% { top: 95%; }
+      100% { top: 5%; }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen pb-12">
+
+  <!-- Header -->
+  <header class="bg-blue-700 text-white shadow-md sticky top-0 z-40">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center space-x-2">
+        <i class="fa-solid fa-clapperboard text-2xl text-yellow-300"></i>
+        <div>
+          <h1 class="text-base font-bold leading-tight">Chấm Tự Luận Tin Học 11 - VideoPad</h1>
+          <p class="text-xs text-blue-200">Trường THPT Bình Tân | Mã đề 1101 & 1102</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2">
+        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-900 text-blue-100">
+          <i class="fa-brands fa-apple mr-1"></i> iOS Ready
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 mt-4 space-y-4">
+    
+    <!-- Bộ điều khiển chọn đề & cấu hình -->
+    <section class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Mã Đề Thi</label>
+        <select id="examCode" onchange="onExamChange()" class="w-full bg-slate-50 border border-slate-300 text-sm font-bold text-blue-700 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none">
+          <option value="1101">Đề 1101 (An toàn giao thông đến trường)</option>
+          <option value="1102">Đề 1102 (Nếp sống văn minh học đường)</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Lớp Mặc Định</label>
+        <input type="text" id="targetClass" value="11A1" placeholder="VD: 11A1" class="w-full bg-slate-50 border border-slate-300 text-sm font-semibold rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Tên Học Sinh (Nhận diện / Sửa)</label>
+        <input type="text" id="studentName" placeholder="Tự nhận diện hoặc nhập tên..." class="w-full bg-slate-50 border border-slate-300 text-sm font-semibold rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none">
+      </div>
+    </section>
+
+    <!-- Khu vực Camera / Nhập nội dung bài thi -->
+    <section class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <!-- Tabs -->
+      <div class="flex border-b border-slate-200 bg-slate-50 text-sm font-medium">
+        <button id="tabCamBtn" onclick="switchTab('cam')" class="flex-1 py-3 text-center border-b-2 border-blue-600 text-blue-600 font-bold bg-white">
+          <i class="fa-solid fa-camera mr-1"></i> Quét Bằng Camera Sau / Tải Ảnh
+        </button>
+        <button id="tabCodeBtn" onclick="switchTab('code')" class="flex-1 py-3 text-center text-slate-600 hover:text-blue-600">
+          <i class="fa-solid fa-file-lines mr-1"></i> Nhập / Dán Bài Làm Dạng Chữ
+        </button>
+      </div>
+
+      <!-- Tab Camera -->
+      <div id="tabCam" class="p-4 space-y-3">
+        <div class="relative w-full bg-black rounded-lg overflow-hidden flex items-center justify-center min-h-[300px] max-h-[440px]">
+          <video id="video" autoplay playsinline muted class="w-full h-full object-contain hidden"></video>
+          <img id="capturedImage" class="w-full h-full object-contain hidden" alt="Ảnh chụp bài làm">
+          
+          <div id="cameraPlaceholder" class="text-center p-6 text-slate-400">
+            <i class="fa-solid fa-camera-retro text-4xl mb-2 text-slate-500"></i>
+            <p class="text-sm">Chưa khởi động camera</p>
+            <p class="text-xs text-slate-500 mt-1">Bấm "Bật Camera Sau" bên dưới để quét trực tiếp</p>
+          </div>
+
+          <div id="scanLaser" class="scan-laser hidden"></div>
+
+          <!-- Trạng thái OCR -->
+          <div id="ocrStatus" class="absolute bottom-3 left-3 right-3 bg-slate-900/85 text-white text-xs px-3 py-2 rounded-lg backdrop-blur hidden">
+            <span id="ocrStatusText"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Đang đọc bài làm tự luận...</span>
+          </div>
+        </div>
+
+        <!-- Điều khiển Camera -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <button id="btnStartCam" onclick="startCamera()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2.5 px-3 rounded-lg flex items-center justify-center shadow">
+            <i class="fa-solid fa-video mr-1.5"></i> Bật Camera Sau
+          </button>
+          
+          <button id="btnCapture" onclick="captureAndOCR()" disabled class="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-semibold py-2.5 px-3 rounded-lg flex items-center justify-center shadow">
+            <i class="fa-solid fa-bolt mr-1.5"></i> Chụp & Chấm
+          </button>
+
+          <!-- Input File native iPhone Camera -->
+          <label class="col-span-2 sm:col-span-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-sm font-semibold py-2.5 px-3 rounded-lg flex items-center justify-center cursor-pointer text-center">
+            <i class="fa-solid fa-camera-viewfinder mr-1.5"></i> Chụp bằng iOS Cam
+            <input type="file" id="nativeFileInput" accept="image/*" capture="environment" class="hidden" onchange="handleNativeImage(event)">
+          </label>
+        </div>
+      </div>
+
+      <!-- Tab Dán Bài Làm Văn Bản -->
+      <div id="tabCode" class="p-4 space-y-3 hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-500 uppercase">Nội dung bài thi của học sinh:</span>
+          <button onclick="loadSampleText()" class="text-xs text-blue-600 hover:underline font-medium">
+            <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Nạp Bài Làm Mẫu Chuẩn Theo Đề
+          </button>
+        </div>
+        <textarea id="rawTextInput" rows="10" placeholder="Dán bài làm tự luận của học sinh tại đây..." class="w-full font-mono text-xs p-3 bg-slate-900 text-cyan-300 rounded-lg border border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+        
+        <button onclick="gradeCurrentText()" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 px-4 rounded-lg shadow flex items-center justify-center">
+          <i class="fa-solid fa-clipboard-check mr-2"></i> Chấm Điểm Bài Này
+        </button>
+      </div>
+    </section>
+
+    <!-- Kết quả Chấm Điểm -->
+    <section id="resultSection" class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-4 hidden">
+      <div class="flex flex-wrap items-center justify-between border-b pb-3 gap-2">
+        <div>
+          <span class="text-xs font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-700 mr-2" id="resBadge">Đề 1101</span>
+          <span class="font-bold text-slate-800 text-base" id="resStudent">Học sinh: Nguyễn Văn A</span>
+          <span class="text-xs text-slate-500 ml-2" id="resClass">(Lớp: 11A1)</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="text-xs text-slate-500 font-medium">Tổng điểm:</span>
+          <span class="text-2xl font-black text-rose-600" id="resScore">0.0</span>
+          <span class="text-sm font-bold text-slate-400">/ 2.0</span>
+        </div>
+      </div>
+
+      <!-- Chi tiết tiêu chí -->
+      <div class="space-y-2">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Chi tiết barem chấm điểm tự động:</h3>
+        <div id="criteriaList" class="space-y-1.5 text-xs"></div>
+      </div>
+
+      <!-- Phân tích nội dung phát hiện -->
+      <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2 text-xs">
+        <h3 class="font-bold uppercase tracking-wider text-slate-600">Trích xuất nội dung chính:</h3>
+        <div id="detectedKeywords" class="text-slate-600 space-y-1"></div>
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <button onclick="saveCurrentResult()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-2 px-4 rounded-lg shadow">
+          <i class="fa-solid fa-floppy-disk mr-1"></i> Lưu Vào Sổ Điểm
+        </button>
+      </div>
+    </section>
+
+    <!-- Bảng Sổ Điểm -->
+    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+        <div class="flex items-center space-x-2">
+          <i class="fa-solid fa-table-list text-blue-600"></i>
+          <h2 class="font-bold text-slate-800 text-sm">Sổ Điểm Tin Học 11</h2>
+          <span id="recordCount" class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-semibold">0 bài</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button onclick="exportToCSV()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-1.5 px-3 rounded-md border border-slate-300">
+            <i class="fa-solid fa-file-excel mr-1 text-emerald-600"></i> Xuất CSV (Excel)
+          </button>
+          <button onclick="clearHistory()" class="text-xs text-rose-500 hover:text-rose-700 py-1.5 px-2">
+            Xoá hết
+          </button>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto max-h-64">
+        <table class="w-full text-left text-xs text-slate-600">
+          <thead class="bg-slate-50 text-slate-700 uppercase font-semibold border-b">
+            <tr>
+              <th class="py-2 px-3">Thời gian</th>
+              <th class="py-2 px-3">Lớp</th>
+              <th class="py-2 px-3">Họ và Tên</th>
+              <th class="py-2 px-3">Đề</th>
+              <th class="py-2 px-3 text-right">Điểm Câu 1</th>
+              <th class="py-2 px-3 text-right">Điểm Câu 2</th>
+              <th class="py-2 px-3 text-right font-bold text-blue-700">Tổng Điểm</th>
+            </tr>
+          </thead>
+          <tbody id="gradeTableBody" class="divide-y divide-slate-100">
+            <tr>
+              <td colspan="7" class="text-center py-4 text-slate-400">Chưa có bài chấm nào được lưu.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <canvas id="hiddenCanvas" class="hidden"></canvas>
+
+  <script>
+    let videoStream = null;
+    let savedRecords = JSON.parse(localStorage.getItem('thpt_binhtan_grades_11') || '[]');
+    let currentGradeResult = null;
+
+    window.onload = function() {
+      renderGradeTable();
+    };
+
+    function onExamChange() {
+      const exam = document.getElementById('examCode').value;
+      if (document.getElementById('rawTextInput').value.trim() !== '') {
+        gradeCurrentText();
+      }
+    }
+
+    function switchTab(tab) {
+      const tabCam = document.getElementById('tabCam');
+      const tabCode = document.getElementById('tabCode');
+      const tabCamBtn = document.getElementById('tabCamBtn');
+      const tabCodeBtn = document.getElementById('tabCodeBtn');
+
+      if (tab === 'cam') {
+        tabCam.classList.remove('hidden');
+        tabCode.classList.add('hidden');
+        tabCamBtn.className = "flex-1 py-3 text-center border-b-2 border-blue-600 text-blue-600 font-bold bg-white";
+        tabCodeBtn.className = "flex-1 py-3 text-center text-slate-600 hover:text-blue-600";
+      } else {
+        tabCam.classList.add('hidden');
+        tabCode.classList.remove('hidden');
+        tabCodeBtn.className = "flex-1 py-3 text-center border-b-2 border-blue-600 text-blue-600 font-bold bg-white";
+        tabCamBtn.className = "flex-1 py-3 text-center text-slate-600 hover:text-blue-600";
+        stopCamera();
+      }
+    }
+
+    // ==========================================
+    // CAMERA SAU (TỐI ƯU CHO IOS SAFARI)
+    // ==========================================
+    async function startCamera() {
+      const video = document.getElementById('video');
+      const placeholder = document.getElementById('cameraPlaceholder');
+      const capturedImg = document.getElementById('capturedImage');
+      const btnStart = document.getElementById('btnStartCam');
+      const btnCapture = document.getElementById('btnCapture');
+
+      stopCamera();
+      capturedImg.classList.add('hidden');
+
+      const constraints = {
+        audio: false,
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      };
+
+      try {
+        videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = videoStream;
+        video.setAttribute("playsinline", true);
+        await video.play();
+
+        video.classList.remove('hidden');
+        placeholder.classList.add('hidden');
+        btnCapture.disabled = false;
+        btnStart.innerHTML = '<i class="fa-solid fa-arrows-rotate mr-1.5"></i> Đổi Camera';
+      } catch (err) {
+        console.error("Camera Error:", err);
+        alert("Không thể mở camera sau: " + (err.message || "Vui lòng cấp quyền Camera trên Safari!"));
+      }
+    }
+
+    function stopCamera() {
+      if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+      }
+    }
+
+    async function captureAndOCR() {
+      const video = document.getElementById('video');
+      const canvas = document.getElementById('hiddenCanvas');
+      const laser = document.getElementById('scanLaser');
+      const ocrStatus = document.getElementById('ocrStatus');
+      const capturedImg = document.getElementById('capturedImage');
+
+      if (!video.videoWidth) return;
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      capturedImg.src = dataUrl;
+      capturedImg.classList.remove('hidden');
+      video.classList.add('hidden');
+      stopCamera();
+
+      laser.classList.remove('hidden');
+      ocrStatus.classList.remove('hidden');
+
+      await runOCR(dataUrl);
+
+      laser.classList.add('hidden');
+      ocrStatus.classList.add('hidden');
+    }
+
+    function handleNativeImage(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        const dataUrl = e.target.result;
+        const capturedImg = document.getElementById('capturedImage');
+        const video = document.getElementById('video');
+        const placeholder = document.getElementById('cameraPlaceholder');
+        const laser = document.getElementById('scanLaser');
+        const ocrStatus = document.getElementById('ocrStatus');
+
+        stopCamera();
+        video.classList.add('hidden');
+        placeholder.classList.add('hidden');
+        capturedImg.src = dataUrl;
+        capturedImg.classList.remove('hidden');
+
+        laser.classList.remove('hidden');
+        ocrStatus.classList.remove('hidden');
+
+        await runOCR(dataUrl);
+
+        laser.classList.add('hidden');
+        ocrStatus.classList.add('hidden');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function runOCR(imageSource) {
+      const statusText = document.getElementById('ocrStatusText');
+      try {
+        statusText.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Đang nạp mô hình OCR tiếng Việt...';
+        
+        const worker = await Tesseract.createWorker('vie');
+        statusText.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Đang đọc bài làm tự luận...';
+        
+        const ret = await worker.recognize(imageSource);
+        const text = ret.data.text;
+        await worker.terminate();
+
+        detectStudentMeta(text);
+        document.getElementById('rawTextInput').value = text;
+        evaluateExam(text);
+
+      } catch (err) {
+        console.error("OCR Error:", err);
+        alert("Lỗi khi quét OCR: Bạn có thể nhập trực tiếp vào tab bài làm.");
+      }
+    }
+
+    function detectStudentMeta(rawText) {
+      const nameMatch = rawText.match(/(?:Họ\s*(?:và|&)?\s*tên|Họ\s*tên|Học\s*sinh)\s*[:\-]?\s*([^
+,.<>]+)/i);
+      if (nameMatch && nameMatch[1]) {
+        const cleanedName = nameMatch[1].trim().replace(/['"“”;:]/g, '');
+        if (cleanedName.length > 2 && cleanedName.length < 35) {
+          document.getElementById('studentName').value = cleanedName;
+        }
+      }
+
+      const classMatch = rawText.match(/(?:Lớp)\s*[:\-]?\s*(11[A-Za-z0-9]+)/i);
+      if (classMatch && classMatch[1]) {
+        document.getElementById('targetClass').value = classMatch[1].trim().toUpperCase();
+      }
+    }
+
+    function gradeCurrentText() {
+      const text = document.getElementById('rawTextInput').value;
+      if (!text.trim()) {
+        alert("Vui lòng nhập hoặc chụp bài làm của học sinh!");
+        return;
+      }
+      evaluateExam(text);
+    }
+
+    // ==========================================
+    // BAREM VÀ THUẬT TOÁN CHẤM TỰ LUẬN TIN HỌC 11
+    // ==========================================
+    function evaluateExam(rawText) {
+      const exam = document.getElementById('examCode').value;
+      const t = rawText.toLowerCase();
+      let criteria = [];
+
+      // CÂU 1 (1.0 điểm): 4 BƯỚC BIÊN TẬP TRÊN VIDEOPAD (DÙNG CHUNG BAREM 1101 & 1102)
+      // Bước 1: Thay thế hình ảnh trong kịch bản cũ (0.25đ)
+      const b1 = /(?:thay\s*thế|replace|đổi\s*ảnh|chèn\s*ảnh\s*mới|thay\s*ảnh|replace\s*clip)/i.test(rawText);
+      criteria.push({
+        title: "Câu 1 - Bước 1: Thay thế hình ảnh trong kịch bản cũ (Replace Clip / thay ảnh mới)",
+        max: 0.25,
+        score: b1 ? 0.25 : 0,
+        desc: "Thao tác chọn clip cũ và thay bằng hình ảnh mới trên VideoPad"
+      });
+
+      // Bước 2: Thay đổi thời lượng hiển thị phân cảnh (0.25đ)
+      const b2 = /(?:thời\s*lượng|duration|thời\s*gian\s*hiển\s*thị|kéo\s*dài|rút\s*ngắn|giây|timeline)/i.test(rawText);
+      criteria.push({
+        title: "Câu 1 - Bước 2: Thay đổi thời lượng hiển thị phân cảnh (Duration / kéo dãn timeline)",
+        max: 0.25,
+        score: b2 ? 0.25 : 0,
+        desc: "Điều chỉnh Clip Duration hoặc kéo mép clip trên timeline"
+      });
+
+      // Bước 3: Chèn hiệu ứng chuyển cảnh Cross Fade (0.25đ)
+      const b3 = /(?:cross\s*fade|chuyển\s*cảnh|transition|hiệu\s*ứng\s*chuyển)/i.test(rawText);
+      const b3Exact = /cross\s*fade/i.test(rawText);
+      criteria.push({
+        title: "Câu 1 - Bước 3: Chèn hiệu ứng chuyển cảnh Cross Fade",
+        max: 0.25,
+        score: b3Exact ? 0.25 : (b3 ? 0.15 : 0),
+        desc: "Chọn biểu tượng chuyển cảnh giữa 2 clip và chọn kiểu Cross Fade"
+      });
+
+      // Bước 4: Thiết lập hiệu ứng âm thanh nhỏ dần (Fade Out) cho nhạc nền (0.25đ)
+      const b4 = /(?:fade\s*out|nhỏ\s*dần|giảm\s*dần\s*âm|âm\s*thanh|nhạc\s*nền|audio)/i.test(rawText);
+      const b4Exact = /fade\s*out/i.test(rawText);
+      criteria.push({
+        title: "Câu 1 - Bước 4: Thiết lập hiệu ứng âm thanh nhỏ dần (Fade Out) cho nhạc nền",
+        max: 0.25,
+        score: b4Exact ? 0.25 : (b4 ? 0.15 : 0),
+        desc: "Áp dụng hiệu ứng Fade Out ở cuối bài nhạc nền trên track Audio"
+      });
+
+      // CÂU 2 (1.0 điểm): KỊCH BẢN PHIM HOẠT HÌNH 30 GIÂY & GIẢI PHÁP KỸ THUẬT
+      if (exam === '1101') {
+        // Đề 1101: An toàn giao thông đến trường
+        // Tiêu chí 2a: Thiết kế kịch bản dạng bảng 4 cột cho ít nhất 3 phân cảnh (0.5đ)
+        const hasCols = /(?:phân\s*cảnh|cảnh).*(?:hình\s*ảnh).*(?:lời\s*thoại|âm\s*thanh).*(?:phụ\s*đề)/is.test(rawText) ||
+                        (/(?:cảnh\s*1|phân\s*cảnh\s*1)/i.test(rawText) && /(?:cảnh\s*2|phân\s*cảnh\s*2)/i.test(rawText) && /(?:cảnh\s*3|phân\s*cảnh\s*3)/i.test(rawText));
+        const topic1101 = /(?:an\s*toàn\s*giao\s*thông|mũ\s*bảo\s*hiểm|đèn\s*đỏ|qua\s*đường|giao\s*thông|xe\s*máy|đạp\s*xe)/i.test(rawText);
+        
+        let c2a_score = 0;
+        if (hasCols && topic1101) c2a_score = 0.5;
+        else if (hasCols || topic1101) c2a_score = 0.3;
+        else if (/(?:cảnh|thoại|phụ\s*đề)/i.test(rawText)) c2a_score = 0.15;
+
+        criteria.push({
+          title: "Câu 2a: Kịch bản 4 cột (Phân cảnh, Hình ảnh, Lời thoại/Âm thanh, Phụ đề) - Chủ đề An toàn giao thông (≥ 3 cảnh)",
+          max: 0.5,
+          score: c2a_score,
+          desc: "Thiết kế bảng kịch bản chi tiết đúng chủ đề ATGT đến trường"
+        });
+
+      } else {
+        // Đề 1102: Nếp sống văn minh học đường
+        // Tiêu chí 2a: Thiết kế kịch bản dạng bảng 4 cột cho ít nhất 3 phân cảnh (0.5đ)
+        const hasCols = /(?:phân\s*cảnh|cảnh).*(?:hình\s*ảnh).*(?:lời\s*thoại|âm\s*thanh).*(?:phụ\s*đề)/is.test(rawText) ||
+                        (/(?:cảnh\s*1|phân\s*cảnh\s*1)/i.test(rawText) && /(?:cảnh\s*2|phân\s*cảnh\s*2)/i.test(rawText) && /(?:cảnh\s*3|phân\s*cảnh\s*3)/i.test(rawText));
+        const topic1102 = /(?:văn\s*minh|học\s*đường|chào\s*hỏi|đồng\s*phục|rác|vứt\s*rác|tôn\s*trọng|thầy\s*cô|bạn\s*bè)/i.test(rawText);
+        
+        let c2a_score = 0;
+        if (hasCols && topic1102) c2a_score = 0.5;
+        else if (hasCols || topic1102) c2a_score = 0.3;
+        else if (/(?:cảnh|thoại|phụ\s*đề)/i.test(rawText)) c2a_score = 0.15;
+
+        criteria.push({
+          title: "Câu 2a: Kịch bản 4 cột (Phân cảnh, Hình ảnh, Lời thoại/Âm thanh, Phụ đề) - Chủ đề Nếp sống văn minh học đường (≥ 3 cảnh)",
+          max: 0.5,
+          score: c2a_score,
+          desc: "Thiết kế bảng kịch bản chi tiết đúng chủ đề Văn minh học đường"
+        });
+      }
+
+      // Tiêu chí 2b: Phân tích kỹ thuật trên Timeline & lồng tiếng Record Narration để khớp thời lượng (0.5đ)
+      const hasTimeline = /(?:timeline|thước\s*thời\s*gian|dòng\s*thời\s*gian|đồng\s*bộ|cắt\s*ghép)/i.test(rawText);
+      const hasNarration = /(?:record\s*narration|lồng\s*tiếng|thu\s*âm|ghi\s*âm\s*trực\s*tiếp)/i.test(rawText);
+      const hasSync = /(?:trùng\s*khớp|khớp|đồng\s*bộ\s*thời\s*lượng|kéo\s*dài\s*ảnh|khớp\s*lời)/i.test(rawText);
+
+      let c2b_score = 0;
+      if (hasNarration && hasSync) c2b_score = 0.5;
+      else if (hasNarration || (hasTimeline && hasSync)) c2b_score = 0.35;
+      else if (hasTimeline || hasSync) c2b_score = 0.2;
+
+      criteria.push({
+        title: "Câu 2b: Giải pháp kỹ thuật xử lý Timeline & lồng tiếng Record Narration trùng khớp hoàn toàn",
+        max: 0.5,
+        score: c2b_score,
+        desc: "Sử dụng tính năng Record Narration và căn chỉnh thời lượng hình ảnh trên Video Track khớp với Audio Track"
+      });
+
+      // Tính tổng điểm
+      const scoreC1 = criteria.slice(0, 4).reduce((sum, c) => sum + c.score, 0);
+      const scoreC2 = criteria.slice(4).reduce((sum, c) => sum + c.score, 0);
+      const totalScore = Math.min(2.0, Math.round((scoreC1 + scoreC2) * 100) / 100);
+
+      // Render giao diện kết quả
+      document.getElementById('resultSection').classList.remove('hidden');
+      document.getElementById('resBadge').innerText = "Đề " + exam;
+      const sName = document.getElementById('studentName').value.trim() || "Chưa xác định họ tên";
+      const sClass = document.getElementById('targetClass').value.trim() || "11A1";
+      document.getElementById('resStudent').innerText = "Học sinh: " + sName;
+      document.getElementById('resClass').innerText = "(Lớp: " + sClass + ")";
+      document.getElementById('resScore').innerText = totalScore.toFixed(2);
+
+      const listEl = document.getElementById('criteriaList');
+      listEl.innerHTML = '';
+      criteria.forEach(item => {
+        const isFull = item.score === item.max;
+        const isZero = item.score === 0;
+        const colorClass = isFull ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : (isZero ? 'text-rose-700 bg-rose-50 border-rose-200' : 'text-amber-800 bg-amber-50 border-amber-200');
+        const icon = isFull ? 'fa-check' : (isZero ? 'fa-xmark' : 'fa-exclamation');
+
+        listEl.innerHTML += `
+          <div class="p-2 rounded border flex items-center justify-between ${colorClass}">
+            <div class="flex items-start space-x-2">
+              <i class="fa-solid ${icon} mt-0.5"></i>
+              <div>
+                <p class="font-semibold">${item.title}</p>
+                <p class="text-[11px] opacity-80">${item.desc}</p>
+              </div>
+            </div>
+            <span class="font-bold whitespace-nowrap ml-2">${item.score.toFixed(2)} / ${item.max.toFixed(2)}đ</span>
+          </div>
+        `;
+      });
+
+      // Tóm tắt từ khoá nhận diện
+      const detectedBox = document.getElementById('detectedKeywords');
+      detectedBox.innerHTML = `
+        <p>• <strong>Thuật ngữ VideoPad tìm thấy:</strong> 
+          <span class="px-1.5 py-0.5 bg-slate-200 rounded text-[11px] font-mono">${/replace/i.test(rawText) ? 'Replace Clip (OK)' : 'Replace Clip (Thiếu)'}</span>,
+          <span class="px-1.5 py-0.5 bg-slate-200 rounded text-[11px] font-mono">${/cross\s*fade/i.test(rawText) ? 'Cross Fade (OK)' : 'Cross Fade (Thiếu)'}</span>,
+          <span class="px-1.5 py-0.5 bg-slate-200 rounded text-[11px] font-mono">${/fade\s*out/i.test(rawText) ? 'Fade Out (OK)' : 'Fade Out (Thiếu)'}</span>,
+          <span class="px-1.5 py-0.5 bg-slate-200 rounded text-[11px] font-mono">${/record\s*narration/i.test(rawText) ? 'Record Narration (OK)' : 'Record Narration (Thiếu)'}</span>
+        </p>
+      `;
+
+      currentGradeResult = {
+        id: Date.now(),
+        date: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+        studentName: sName,
+        className: sClass,
+        examCode: exam,
+        scoreC1: scoreC1.toFixed(2),
+        scoreC2: scoreC2.toFixed(2),
+        totalScore: totalScore.toFixed(2)
+      };
+    }
+
+    // ==========================================
+    // LƯU TRỮ VÀ XUẤT SỔ ĐIỂM
+    // ==========================================
+    function saveCurrentResult() {
+      if (!currentGradeResult) return;
+      savedRecords.unshift(currentGradeResult);
+      localStorage.setItem('thpt_binhtan_grades_11', JSON.stringify(savedRecords));
+      renderGradeTable();
+      alert("Đã lưu điểm cho học sinh: " + currentGradeResult.studentName + " (" + currentGradeResult.className + ")!");
+    }
+
+    function renderGradeTable() {
+      const tbody = document.getElementById('gradeTableBody');
+      const countEl = document.getElementById('recordCount');
+      countEl.innerText = savedRecords.length + " bài";
+
+      if (savedRecords.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-slate-400">Chưa có bài chấm nào được lưu.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = savedRecords.map(r => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-2 px-3 text-slate-400">${r.date}</td>
+          <td class="py-2 px-3 font-semibold text-slate-700">${r.className}</td>
+          <td class="py-2 px-3 font-bold text-slate-900">${r.studentName}</td>
+          <td class="py-2 px-3"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700">Đề ${r.examCode}</span></td>
+          <td class="py-2 px-3 text-right font-medium text-slate-600">${r.scoreC1}</td>
+          <td class="py-2 px-3 text-right font-medium text-slate-600">${r.scoreC2}</td>
+          <td class="py-2 px-3 text-right font-black text-rose-600">${r.totalScore}</td>
+        </tr>
+      `).join('');
+    }
+
+    function clearHistory() {
+      if (confirm("Thầy/Cô có chắc chắn muốn xoá toàn bộ sổ điểm lớp 11 đã lưu?")) {
+        savedRecords = [];
+        localStorage.removeItem('thpt_binhtan_grades_11');
+        renderGradeTable();
+      }
+    }
+
+    function exportToCSV() {
+      if (savedRecords.length === 0) {
+        alert("Chưa có dữ liệu bài chấm để xuất!");
+        return;
+      }
+
+      let csvContent = "﻿"; // UTF-8 BOM
+      csvContent += "Thời gian,Lớp,Họ và Tên,Mã Đề,Điểm Câu 1,Điểm Câu 2,Tổng Điểm (Thang 2.0)
+";
+
+      savedRecords.forEach(r => {
+        csvContent += `"${r.date}","${r.className}","${r.studentName}","${r.examCode}","${r.scoreC1}","${r.scoreC2}","${r.totalScore}"
+`;
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `Diem_TuLuan_Tin11_${document.getElementById('targetClass').value || 'ToanTruong'}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // Nạp bài mẫu kiểm thử barem
+    function loadSampleText() {
+      const exam = document.getElementById('examCode').value;
+      if (exam === '1101') {
+        document.getElementById('studentName').value = "Trần Minh Quân";
+        document.getElementById('rawTextInput').value = 
+`Họ và tên: Trần Minh Quân - Lớp: 11A1
+PHẦN III. TỰ LUẬN
+Câu 1 (1.0 điểm): Quy trình 4 bước biên tập phim ngắn trên VideoPad:
+- Bước 1: Thay thế hình ảnh trong kịch bản cũ bằng cách nhấp chuột phải vào clip trên Timeline chọn Replace Clip (hoặc kéo thả ảnh mới vào vị trí phân cảnh cũ).
+- Bước 2: Thay đổi thời lượng hiển thị phân cảnh: chọn clip, mở thuộc tính Clip Duration hoặc rê chuột vào mép phân cảnh trên Timeline để kéo dài/thu ngắn thời lượng theo ý muốn.
+- Bước 3: Chèn hiệu ứng chuyển cảnh: nhấp vào biểu tượng dấu nối Transition giữa hai clip trên Timeline, chọn hiệu ứng Cross Fade và chỉnh thời gian chuyển cảnh.
+- Bước 4: Thiết lập âm thanh nhỏ dần cho nhạc nền: chọn đoạn nhạc trên Audio Track, vào menu Effects -> Audio chọn Fade Out để âm thanh nhỏ dần về cuối clip.
+
+Câu 2 (1.0 điểm): Kịch bản hoạt hình 30s "An toàn giao thông đến trường":
+1. Bảng kịch bản chi tiết:
+| Phân cảnh | Hình ảnh | Lời thoại / Âm thanh | Phụ đề |
+| Cảnh 1 (10s) | Học sinh chuẩn bị xe đạp điện và đội mũ bảo hiểm | Tiếng chim hót, nhạc vui tươi: "Trước khi đến trường, nhớ cài quai nón chắc chắn nhé!" | Đội mũ bảo hiểm đúng quy cách |
+| Cảnh 2 (10s) | Đèn tín hiệu giao thông chuyển đỏ, học sinh dừng trước vạch | Tiếng còi xe nhẹ, lời thoại: "Đèn đỏ rồi, cùng dừng lại trước vạch quy định nào!" | Chấp hành tín hiệu đèn giao thông |
+| Cảnh 3 (10s) | Học sinh vui vẻ vào cổng trường THPT Bình Tân | Nhạc nền rộn ràng: "An toàn giao thông là hạnh phúc của mọi nhà!" | Đến trường an toàn - Vững bước tương lai |
+
+2. Giải pháp kỹ thuật trên Timeline & Record Narration:
+- Sử dụng tính năng Record Narration trên VideoPad để giáo viên/học sinh đọc và thu âm trực tiếp lời thoại theo từng phân cảnh trên Audio Track.
+- Điều chỉnh trên Video Track: kéo dãn hoặc thu ngắn thời lượng (Duration) của hình ảnh phân cảnh sao cho khớp hoàn toàn với độ dài sóng âm (waveform) của file ghi âm lời thoại lồng tiếng tương ứng.`;
+      } else {
+        document.getElementById('studentName').value = "Lê Thị Ngọc Mai";
+        document.getElementById('rawTextInput').value = 
+`Họ và tên: Lê Thị Ngọc Mai - Lớp: 11A2
+PHẦN III. TỰ LUẬN
+Câu 1 (1.0 điểm): Quy trình kĩ thuật 4 bước trên VideoPad:
+- Bước 1: Thay thế hình ảnh trong kịch bản cũ: dùng tính năng Replace Clip hoặc thêm ảnh mới thay thế vị trí cũ trên Timeline.
+- Bước 2: Chỉnh thời lượng hiển thị: điều chỉnh Clip Duration hoặc kéo dãn mép clip trên dòng thời gian Timeline.
+- Bước 3: Chèn hiệu ứng chuyển cảnh Cross Fade trong danh mục Transitions nối giữa các phân cảnh.
+- Bước 4: Thiết lập âm thanh nhỏ dần (Fade Out) cho bài nhạc nền ở cuối timeline.
+
+Câu 2 (1.0 điểm): Kịch bản phim hoạt hình 30s "Nếp sống văn minh học đường":
+1. Bảng kịch bản 4 cột:
+| Phân cảnh | Hình ảnh | Lời thoại / Âm thanh | Phụ đề |
+| Cảnh 1 (10s) | Học sinh mặc đồng phục chỉnh tề, khoanh tay chào thầy cô | Lời thoại: "Em chào thầy cô ạ!" - Âm thanh tiếng trống trường | Lễ phép chào hỏi thầy cô |
+| Cảnh 2 (10s) | Bạn học sinh nhặt vỏ hộp sữa bỏ vào thùng rác phân loại | Tiếng chim hót: "Giữ gìn sân trường xanh - sạch - đẹp bạn nhé!" | Bỏ rác đúng nơi quy định |
+| Cảnh 3 (10s) | Nhóm bạn giúp đỡ nhau giải bài tập trong lớp học | Nhạc nền tươi vui: "Học tập chăm ngoan, xây dựng nét đẹp Bình Tân!" | Nếp sống văn minh học đường |
+
+2. Kỹ thuật Timeline & Record Narration:
+- Dùng chức năng Record Narration để lồng tiếng trực tiếp lời dẫn và hội thoại vào Audio Track.
+- Trên Timeline, quan sát độ dài dải sóng âm thanh (Audio Waveform) và dùng chuột kéo dãn hoặc cắt ghép các phân cảnh hình ảnh trên Video Track tương ứng để hình ảnh chuyển động trùng khớp hoàn toàn với lời thoại.`;
+      }
+      evaluateExam(document.getElementById('rawTextInput').value);
+    }
+  </script>
+</body>
+</html>
